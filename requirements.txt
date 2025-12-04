@@ -1,0 +1,4 @@
+mesa
+pydantic
+matplotlib
+numpy
