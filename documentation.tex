@@ -1,0 +1,208 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{graphicx}
+\usepackage{hyperref}
+
+\title{Analysis and Implementation of Linear Consensus Protocols in Multi-Agent Systems}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This document presents the design, implementation, and simulation of linear consensus protocols within a multi-agent system (MAS). We explore the problem of reaching agreement among agents with imperfect measurements and limited communication. Specifically, we implement and compare a standard Linear Consensus protocol against a Max-Consensus protocol using the MESA framework in Python. The goal is to demonstrate how theoretical consensus algorithms can be translated into a working software simulation to analyze their convergence properties and behavior under different network topologies.
+\end{abstract}
+
+\section{Introduction}
+
+Multi-agent systems (MAS) consist of multiple interacting intelligent agents that can solve problems that are difficult or impossible for an individual agent or a monolithic system to solve. A fundamental problem in MAS is \textit{consensus}, where a group of agents must agree on a specific value or state based on their local measurements and interaction with neighbors.
+
+In this project, we analyze, implement, and simulate a linear consensus protocol where agents aim to agree on the average of their initial measurements. To provide a comprehensive study, we also implement a Max-Consensus protocol for comparison.
+
+The structure of this documentation is as follows:
+\begin{itemize}
+    \item First, we introduce the \textbf{Theoretical Framework}, defining the graph theory preliminaries and the mathematical update rules for both Linear and Max-Consensus protocols. This provides the necessary background to understand the algorithms.
+    \item Next, we detail the \textbf{Implementation}, explaining how the theoretical models are mapped to the MESA framework in Python, including the agent design and simulation architecture.
+    \item Finally, we present the \textbf{Simulation and Results}, where we demonstrate the protocols in action across different network topologies and compare their performance and convergence characteristics.
+\end{itemize}
+
+The theoretical foundation of this work relies on the principles of consensus and cooperation in networked multi-agent systems, as discussed by Olfati-Saber et al. \cite{olfati2007consensus}.
+
+\section{Theoretical Framework}
+
+\subsection{Graph Theory Preliminaries}
+The interaction topology of a network of $N$ agents is modeled as a graph $G = (V, E)$, where $V = \{1, \dots, N\}$ is the set of nodes (agents) and $E \subseteq V \times V$ is the set of edges (communication links). If $(i, j) \in E$, then agent $i$ can receive information from agent $j$. The set of neighbors of agent $i$ is denoted by $N_i = \{j \in V : (i, j) \in E\}$.
+
+\subsection{Linear Consensus Protocol}
+The goal of the linear consensus protocol is for all agents to converge to the average of their initial states, $x_{avg} = \frac{1}{N} \sum_{i=1}^N x_i(0)$. This is often referred to as the \textit{Average Consensus} problem.
+
+\subsubsection{Mathematical Derivation and Convergence}
+The update rule is derived from the discretization of the continuous-time system $\dot{x} = -Lx$, where $L$ is the graph Laplacian matrix. The discrete-time update rule is:
+\begin{equation}
+    x_i(k+1) = x_i(k) + \epsilon \sum_{j \in N_i} (x_j(k) - x_i(k))
+\end{equation}
+where:
+\begin{itemize}
+    \item $x_i(k)$ is the state (value) of agent $i$ at time step $k$.
+    \item $\epsilon$ is the step size (0 < $\epsilon$ < $1/\Delta_{max}$), ensuring stability.
+    \item The term $\sum_{j \in N_i} (x_j(k) - x_i(k))$ acts as a local feedback mechanism. If a neighbor $j$ has a higher value, it "pulls" $x_i$ up; if lower, it "pulls" $x_i$ down.
+\end{itemize}
+
+\textbf{Why it converges:} The global system dynamics can be written as $x(k+1) = Px(k)$, where $P = I - \epsilon L$ is a doubly stochastic matrix. This implies two key properties:
+\begin{enumerate}
+    \item The sum of states is invariant: $\sum x_i(k+1) = \sum x_i(k)$. This guarantees that if they agree, they must agree on the average.
+    \item The variance of the states decreases over time. As $k \to \infty$, $P^k$ converges to a rank-one matrix $\frac{1}{N}\mathbf{1}\mathbf{1}^T$, meaning all states converge to the average value.
+\end{enumerate}
+
+\subsection{Max-Consensus Protocol}
+The goal is for all agents to agree on the maximum initial value in the network, $x_{max} = \max_i x_i(0)$. This is useful for leader election or detecting the highest measurement (e.g., peak temperature).
+
+\subsubsection{Mathematical Derivation and Convergence}
+The update rule is a non-linear flooding algorithm:
+\begin{equation}
+    x_i(k+1) = \max(x_i(k), \max_{j \in N_i} x_j(k))
+\end{equation}
+
+\textbf{Why it converges:}
+\begin{enumerate}
+    \item \textbf{Non-decreasing property:} An agent's value can never decrease. It only updates if it sees a neighbor with a strictly larger value.
+    \item \textbf{Propagation:} The maximum value in the network acts like a wave source. At each step, it propagates to all neighbors of the agents currently holding it.
+    \item \textbf{Finite-time convergence:} Since the network is finite and connected, the maximum value will reach the furthest node in at most $D$ steps, where $D$ is the diameter of the graph. Unlike linear consensus, which is asymptotic, this protocol reaches exact consensus in finite time.
+\end{enumerate}
+
+\subsection{Illustrative Example}
+To make these concepts concrete, consider a simple network of 3 agents connected in a line: $1 - 2 - 3$.
+\textbf{Scenario:} Three temperature sensors measure the following initial values:
+\begin{itemize}
+    \item Agent 1: $x_1(0) = 10$
+    \item Agent 2: $x_2(0) = 20$
+    \item Agent 3: $x_3(0) = 5$
+\end{itemize}
+The global average is $\frac{10+20+5}{3} = 11.67$. The global maximum is $20$.
+
+\subsubsection{Linear Consensus Walkthrough ($\epsilon = 0.2$)}
+\begin{itemize}
+    \item \textbf{k=0}: $x = [10, 20, 5]$
+    \item \textbf{k=1}:
+    \begin{itemize}
+        \item Agent 1 (neighbors: 2): $x_1(1) = 10 + 0.2(20 - 10) = 12$
+        \item Agent 2 (neighbors: 1, 3): $x_2(1) = 20 + 0.2((10-20) + (5-20)) = 20 + 0.2(-10 - 15) = 15$
+        \item Agent 3 (neighbors: 2): $x_3(1) = 5 + 0.2(20 - 5) = 8$
+    \end{itemize}
+    State: $[12, 15, 8]$. Sum: 35 (Invariant).
+    \item \textbf{k=2}:
+    \begin{itemize}
+        \item Agent 1: $12 + 0.2(15 - 12) = 12.6$
+        \item Agent 2: $15 + 0.2((12-15) + (8-15)) = 15 + 0.2(-3 - 7) = 13$
+        \item Agent 3: $8 + 0.2(15 - 8) = 9.4$
+    \end{itemize}
+    State: $[12.6, 13, 9.4]$. Sum: 35.
+\end{itemize}
+Notice how the values are pulling closer together towards the average of $11.67$.
+
+\subsubsection{Max-Consensus Walkthrough}
+\begin{itemize}
+    \item \textbf{k=0}: $x = [10, 20, 5]$
+    \item \textbf{k=1}:
+    \begin{itemize}
+        \item Agent 1 sees 2 (20): $\max(10, 20) = 20$
+        \item Agent 2 sees 1 (10), 3 (5): $\max(20, 10, 5) = 20$
+        \item Agent 3 sees 2 (20): $\max(5, 20) = 20$
+    \end{itemize}
+    State: $[20, 20, 20]$.
+\end{itemize}
+In this specific topology and initialization, consensus is reached in just 1 step because the center node held the maximum. If Agent 1 held the max, it would take 2 steps to reach Agent 3.
+
+\section{Implementation}
+
+The simulation is implemented in Python using the MESA framework, which provides a modular environment for agent-based modeling. The codebase follows a clean architecture pattern, separating domain logic, models, and simulation control.
+
+\subsection{Agent Communication and Model}
+In our simulation, agents do not send messages over a network socket but rather "communicate" by inspecting the state of their neighbors via the shared environment (the Model). This abstraction is handled by the \texttt{ConsensusAgent} class.
+
+At each step, an agent queries the model's grid to identify its neighbors. This corresponds to the set $N_i$ defined in the Theoretical Framework.
+\begin{verbatim}
+# src/simulation/consensus_agent.py
+
+def step(self):
+    # Get neighbors from the model's grid/network
+    neighbors = self.model.grid.get_neighbors(self.pos, include_center=False)
+    
+    # "Receive" information by reading neighbor states
+    neighbor_states = [n.state for n in neighbors if isinstance(n, ConsensusAgent)]
+    
+    # Calculate next value using the protocol
+    self.next_value = self.protocol.calculate_next_value(self.state, neighbor_states)
+\end{verbatim}
+By passing \texttt{neighbor\_states} to the protocol, we simulate the transmission of $x_j(k)$ values from neighbors $j \in N_i$ to agent $i$.
+
+\subsection{Protocols}
+The consensus logic is encapsulated in strategy classes implementing the \texttt{AbstractProtocol} interface. This allows us to switch between different algorithms easily.
+
+\subsubsection{Linear Consensus Implementation}
+The \texttt{LinearConsensus} class implements the update rule described in Equation (1). As defined in the theory section, the new state is the current state plus a weighted sum of differences.
+
+In the code, this is directly translated as follows:
+\begin{verbatim}
+# src/protocols/linear_consensus.py
+
+def calculate_next_value(self, current_state: AgentState, neighbor_states: List[AgentState]) -> float:
+    # ...
+    # Calculate the sum of differences: sum(x_j - x_i)
+    diff_sum = sum(neighbor.value - current_state.value for neighbor in neighbor_states)
+    
+    # Update rule: x_i(k+1) = x_i(k) + epsilon * diff_sum
+    next_val = current_state.value + self.config.epsilon * diff_sum + noise
+    return next_val
+\end{verbatim}
+This snippet shows the direct application of the theoretical formula $x_i(k) + \epsilon \sum (x_j(k) - x_i(k))$.
+
+\subsubsection{Max-Consensus Implementation}
+Similarly, the \texttt{MaxConsensus} class implements the update rule from Equation (2). The theory states that an agent should update its value to the maximum of its own value and its neighbors' values.
+
+The implementation is concise:
+\begin{verbatim}
+# src/protocols/max_consensus.py
+
+def calculate_next_value(self, current_state: AgentState, neighbor_states: List[AgentState]) -> float:
+    # ...
+    # Find the maximum value among neighbors: max(x_j)
+    max_neighbor_val = max(neighbor.value for neighbor in neighbor_states)
+    
+    # Update rule: max(x_i, max(x_j))
+    return max(current_state.value, max_neighbor_val)
+\end{verbatim}
+This effectively realizes the discrete-time update $x_i(k+1) = \max(x_i(k), \max_{j \in N_i} x_j(k))$.
+
+\subsection{Simulation Model (\texttt{ConsensusModel})}
+The \texttt{ConsensusModel} class manages the global state of the simulation. It is responsible for:
+\begin{itemize}
+    \item \textbf{Network Initialization}: Creating the interaction graph using \texttt{networkx}. Supported topologies include Random (Erdos-Renyi), Ring, and Fully Connected graphs.
+    \item \textbf{Agent Creation}: Instantiating agents with random initial values and placing them on the network grid.
+    \item \textbf{Scheduling}: Executing the \texttt{step} and \texttt{advance} methods for all agents in each simulation cycle.
+\end{itemize}
+
+\section{Simulation and Results}
+
+The simulation allows for the comparison of the two protocols under various network topologies.
+
+\subsection{Convergence Behavior}
+\begin{itemize}
+    \item \textbf{Linear Consensus}: Agents' values asymptotically approach the global average. The convergence speed depends on the algebraic connectivity (second smallest eigenvalue of the Laplacian matrix) of the graph. Denser graphs (like fully connected) converge faster than sparse graphs (like rings).
+    \item \textbf{Max-Consensus}: The maximum value propagates through the network. Convergence is achieved once the maximum value has traversed the diameter of the graph. This is typically faster than linear consensus for large networks, as it is a finite-time algorithm.
+\end{itemize}
+
+\subsection{Comparison}
+The simulation clearly demonstrates the trade-off between the type of agreement (average vs. extremum) and the convergence properties. While linear consensus is robust for fusing noisy measurements to find a central tendency, max-consensus is efficient for leader election or extrema detection but sensitive to outliers (e.g., a single infinitely high value would dominate).
+
+\begin{thebibliography}{9}
+\bibitem{olfati2007consensus}
+R. Olfati-Saber, J. A. Fax and R. M. Murray, "Consensus and Cooperation in Networked Multi-Agent Systems," in \textit{Proceedings of the IEEE}, vol. 95, no. 1, pp. 215-233, Jan. 2007.
+\end{thebibliography}
+
+\end{document}
