@@ -1,14 +1,31 @@
-\documentclass{article}
-\usepackage[utf8]{inputenc}
-\usepackage{amsmath}
+\documentclass[conference]{IEEEtran}
+
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
-\usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{placeins}
+
+\usepackage{cite}
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  breakatwhitespace=true,
+  columns=fullflexible,
+  keepspaces=true,
+  frame=single,
+  showstringspaces=false
+}
 
 \title{Analysis and Implementation of Linear Consensus Protocols in Multi-Agent Systems}
-\author{}
-\date{}
+\author{\IEEEauthorblockN{Anja Kovačević, Boris Čuljak}
+\IEEEauthorblockA{Fakultet \ Tehničkih \ Nauka\\
+Email: boris@mail.com}}
 
 \begin{document}
 
@@ -20,60 +37,195 @@ This document presents the design, implementation, and simulation of linear cons
 
 \section{Introduction}
 
-Multi-agent systems (MAS) consist of multiple interacting intelligent agents that can solve problems that are difficult or impossible for an individual agent or a monolithic system to solve. A fundamental problem in MAS is \textit{consensus}, where a group of agents must agree on a specific value or state based on their local measurements and interaction with neighbors.
+Multi-agent systems (MAS) consist of multiple interacting intelligent agents that cooperate to achieve a common objective. In this context, an \textit{intelligent agent} refers to an autonomous entity capable of perceiving its local environment, exchanging information with neighboring agents, and making decisions based on predefined rules or algorithms.
 
-In this project, we analyze, implement, and simulate a linear consensus protocol where agents aim to agree on the average of their initial measurements. To provide a comprehensive study, we also implement a Max-Consensus protocol for comparison.
+MAS are particularly well-suited for solving problems that are difficult or impractical for centralized or monolithic systems. Examples include large-scale sensor networks, where no single node has access to global information, or distributed coordination tasks such as formation control and load balancing, where robustness and scalability are critical.
+
+A fundamental problem in MAS is \textit{consensus}, where a group of agents must agree on a specific value or state using only local measurements and interactions with neighbors. Consensus algorithms enable decentralized coordination without reliance on a central controller.
+
+In this project, we analyze, implement, and simulate a linear consensus protocol in which agents aim to converge to the average of their initial measurements. To provide a comparative perspective, we also implement a Max-Consensus protocol, which allows agents to agree on the maximum initial value in the network.
 
 The structure of this documentation is as follows:
 \begin{itemize}
-    \item First, we introduce the \textbf{Theoretical Framework}, defining the graph theory preliminaries and the mathematical update rules for both Linear and Max-Consensus protocols. This provides the necessary background to understand the algorithms.
-    \item Next, we detail the \textbf{Implementation}, explaining how the theoretical models are mapped to the MESA framework in Python, including the agent design and simulation architecture.
-    \item Finally, we present the \textbf{Simulation and Results}, where we demonstrate the protocols in action across different network topologies and compare their performance and convergence characteristics.
+    \item First, we introduce the \textbf{Theoretical Framework}, presenting relevant graph-theoretic concepts and the mathematical update rules for both linear and max-consensus protocols.
+    \item Next, we describe the \textbf{Implementation}, explaining how the theoretical models are translated into simulations using the \textit{Mesa} framework in Python, including agent behavior and simulation architecture.
+    \item Finally, we present the \textbf{Simulation and Results}, where the behavior, convergence, and performance of the protocols are evaluated across different network topologies.
 \end{itemize}
 
-The theoretical foundation of this work relies on the principles of consensus and cooperation in networked multi-agent systems, as discussed by Olfati-Saber et al. \cite{olfati2007consensus}.
+The theoretical foundation of this work is based on established results in consensus and cooperation in networked multi-agent systems, as discussed by Olfati-Saber \textit{et al.}~\cite{olfati2007consensus}.
 
 \section{Theoretical Framework}
 
 \subsection{Graph Theory Preliminaries}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{Example-graph-topologies.png}
+    \caption{Examples of common communication topologies used in multi-agent systems:
+    (a) ring, (b) grid, (c) tree, and (d) chordal graph.}
+    \label{fig:graph_topologies}
+\end{figure*}
+
 The interaction topology of a network of $N$ agents is modeled as a graph $G = (V, E)$, where $V = \{1, \dots, N\}$ is the set of nodes (agents) and $E \subseteq V \times V$ is the set of edges (communication links). If $(i, j) \in E$, then agent $i$ can receive information from agent $j$. The set of neighbors of agent $i$ is denoted by $N_i = \{j \in V : (i, j) \in E\}$.
 
 \subsection{Linear Consensus Protocol}
-The goal of the linear consensus protocol is for all agents to converge to the average of their initial states, $x_{avg} = \frac{1}{N} \sum_{i=1}^N x_i(0)$. This is often referred to as the \textit{Average Consensus} problem.
+The goal of the linear consensus protocol is for all agents to converge to the average of their initial states,
+\[
+x_{\text{avg}} = \frac{1}{N} \sum_{i=1}^N x_i(0).
+\]
+This task is commonly referred to as the \textit{average consensus} problem.
+
+Although the average value can be computed directly in a centralized setting, such an approach is generally infeasible in multi-agent systems. Each agent has access only to its own initial state and information received from neighboring agents, and no agent possesses global knowledge of all states or the total number of agents. Furthermore, centralized computation requires a global coordinator and reliable global communication, which may be impractical or undesirable in large-scale, dynamic, or failure-prone networks. Consensus protocols address these limitations by enabling agents to compute the global average in a fully distributed manner using only local interactions.
 
 \subsubsection{Mathematical Derivation and Convergence}
-The update rule is derived from the discretization of the continuous-time system $\dot{x} = -Lx$, where $L$ is the graph Laplacian matrix. The discrete-time update rule is:
-\begin{equation}
-    x_i(k+1) = x_i(k) + \epsilon \sum_{j \in N_i} (x_j(k) - x_i(k))
-\end{equation}
-where:
-\begin{itemize}
-    \item $x_i(k)$ is the state (value) of agent $i$ at time step $k$.
-    \item $\epsilon$ is the step size (0 < $\epsilon$ < $1/\Delta_{max}$), ensuring stability.
-    \item The term $\sum_{j \in N_i} (x_j(k) - x_i(k))$ acts as a local feedback mechanism. If a neighbor $j$ has a higher value, it "pulls" $x_i$ up; if lower, it "pulls" $x_i$ down.
-\end{itemize}
 
-\textbf{Why it converges:} The global system dynamics can be written as $x(k+1) = Px(k)$, where $P = I - \epsilon L$ is a doubly stochastic matrix. This implies two key properties:
-\begin{enumerate}
-    \item The sum of states is invariant: $\sum x_i(k+1) = \sum x_i(k)$. This guarantees that if they agree, they must agree on the average.
-    \item The variance of the states decreases over time. As $k \to \infty$, $P^k$ converges to a rank-one matrix $\frac{1}{N}\mathbf{1}\mathbf{1}^T$, meaning all states converge to the average value.
-\end{enumerate}
+The linear consensus protocol can be interpreted as a discrete-time approximation of a continuous-time dynamical system. In continuous time, the evolution of the agents' states is commonly modeled as
+\[
+\dot{x}(t) = -L x(t),
+\]
+Here, $x_i(t) \in \mathbb{R}$ denotes the state of agent $i$ at time $t$, which represents a scalar quantity held locally by the agent, such as a sensor measurement, estimate, or internal value. The vector
+\[
+x(t) = [x_1(t), x_2(t), \dots, x_N(t)]^T
+\]
+collects the states of all $N$ agents at the same time instant into a single global state vector. Although this global vector is used for mathematical analysis, no individual agent has access to $x(t)$ in its entirety. Each agent observes only its own state and those of its neighbors.
+
+The matrix $L$ appearing in the system dynamics captures how agents exchange information over the communication network. To construct this matrix, the interaction topology is first described using standard graph-theoretic representations.
+
+The communication network is modeled as a graph whose nodes correspond to agents and whose edges represent communication links. From this graph, the \emph{adjacency matrix} $A \in \mathbb{R}^{N \times N}$ is defined to encode neighborhood relationships between agents. Its entries are given by
+\[
+A_{ij} =
+\begin{cases}
+1, & \text{if agent } j \text{ communicates with agent } i, \\
+0, & \text{otherwise}.
+\end{cases}
+\]
+For example, in a network of three agents where agent~2 communicates with both agents~1 and~3, the adjacency matrix takes the form
+\[
+A =
+\begin{bmatrix}
+0 & 1 & 0 \\
+1 & 0 & 1 \\
+0 & 1 & 0
+\end{bmatrix}.
+\]
+
+The \emph{degree matrix} $D \in \mathbb{R}^{N \times N}$ is a diagonal matrix that summarizes how many neighbors each agent has. Its diagonal entries are defined as
+\[
+D_{ii} = \deg(i) = \sum_{j=1}^N A_{ij},
+\]
+with all off-diagonal entries equal to zero. For the example above, the degree matrix is
+\[
+D =
+\begin{bmatrix}
+1 & 0 & 0 \\
+0 & 2 & 0 \\
+0 & 0 & 1
+\end{bmatrix}.
+\]
+The degree reflects only the number of communication links connected to an agent and does not represent any physical measurement.
+
+Using the adjacency and degree matrices, the \emph{graph Laplacian}\footnote{
+The term \emph{graph Laplacian} is conceptually distinct from the Laplace transform used in control theory. 
+It originates from the classical Laplacian operator $\nabla^2$, which measures local variation of a quantity 
+in continuous space and appears in diffusion and heat equations. 
+The graph Laplacian is a discrete analogue of this operator defined on a network, quantifying how the state of 
+each agent differs from those of its neighbors.
+} is defined as
+\[
+L = D - A.
+\]
+For example, in a network of three agents, the Laplacian matrix is
+\[
+L =
+\begin{bmatrix}
+1 & -1 & 0 \\
+-1 & 2 & -1 \\
+0 & -1 & 1
+\end{bmatrix}.
+\]
+
+For an undirected graph, the Laplacian has the general entry-wise form
+\[
+L_{ij} =
+\begin{cases}
+\deg(i), & i = j, \\
+-1, & j \in N_i, \\
+0, & \text{otherwise}.
+\end{cases}
+\]
+
+When the Laplacian multiplies the state vector $x(t)$, the $i$-th component of $Lx(t)$ is given by
+\[
+(Lx(t))_i = \sum_{j \in N_i} \bigl(x_i(t) - x_j(t)\bigr),
+\]
+which is a discrete analogue of a spatial second-order derivative. This operation quantifies how different the state of agent $i$ is from the average state of its neighbors.
+
+In this sense, the graph Laplacian does not represent a simple difference between two scalar values, but rather a structured operator that captures local disagreement across the network. Consensus is achieved when these local differences vanish, i.e., when $Lx(t) = 0$, meaning that all neighboring agents hold identical states.
+
+
+Discretizing the continuous-time system using a forward Euler method with step size $\epsilon > 0$ yields the discrete-time update rule
+\begin{equation}
+    x_i(k+1) = x_i(k) + \epsilon \sum_{j \in N_i} \bigl(x_j(k) - x_i(k)\bigr),
+\end{equation}
+where $i$ denotes the updating agent and $j$ indexes its neighboring agents. The summation term represents a local correction based on state differences between agent $i$ and its neighbors.
+
+\paragraph{Convergence properties.}
+The collective system dynamics can be written in matrix form as
+\[
+x(k+1) = P x(k),
+\quad \text{where} \quad
+P = I - \epsilon L.
+\]
+The matrix $P$ arises directly from the Laplacian-based update rule and describes how each agent forms a weighted average of its own state and those of its neighbors at each time step.
+
+For sufficiently small step sizes $\epsilon < 1 / \Delta_{\max}$, where $\Delta_{\max}$ is the maximum node degree, the matrix $P$ is \textit{doubly stochastic}, meaning that the sum of each row and each column equals one. This property has important consequences for convergence.
+
+First, invariance of the sum of states follows directly from double stochasticity:
+\[
+\sum_{i=1}^N x_i(k+1) = \sum_{i=1}^N x_i(k).
+\]
+This implies that the total mass of the system is conserved over time, and therefore any common agreement value must equal the average of the initial states.
+
+Second, repeated multiplication by $P$ reduces disagreements among agents. In particular, the variance of the agent states, which measures how far individual states deviate from their mean, decreases monotonically over time. As $k \to \infty$, the matrix power $P^k$ converges to a rank-one matrix of the form
+\[
+\lim_{k \to \infty} P^k = \frac{1}{N} \mathbf{1} \mathbf{1}^T,
+\]
+where $\mathbf{1}$ is the vector of all ones. A rank-one matrix maps any initial state vector to a vector with identical entries, implying that all agents converge to the same value.
+
+Together, these properties guarantee that the linear consensus protocol converges asymptotically to the average of the initial agent states.
+
 
 \subsection{Max-Consensus Protocol}
-The goal is for all agents to agree on the maximum initial value in the network, $x_{max} = \max_i x_i(0)$. This is useful for leader election or detecting the highest measurement (e.g., peak temperature).
+
+While the linear consensus protocol aims to compute the average of the agents' initial states through iterative local averaging, the Max-Consensus protocol addresses a different coordination objective. Instead of aggregating information, it propagates an extreme value across the network, enabling all agents to agree on the maximum initial state.
+
+Formally, the goal of Max-Consensus is for all agents to converge to
+\[
+x_{\max} = \max_{i} x_i(0).
+\]
+This protocol is particularly useful in applications such as leader election, alarm triggering, or detection of extreme measurements, for example identifying the highest temperature or load in a distributed sensor network.
 
 \subsubsection{Mathematical Derivation and Convergence}
-The update rule is a non-linear flooding algorithm:
-\begin{equation}
-    x_i(k+1) = \max(x_i(k), \max_{j \in N_i} x_j(k))
-\end{equation}
 
-\textbf{Why it converges:}
+Unlike linear consensus, Max-Consensus is governed by a nonlinear update rule that relies on comparison rather than averaging. Each agent updates its state by selecting the largest value among itself and its neighbors:
+\begin{equation}
+    x_i(k+1) = \max\bigl(x_i(k), \max_{j \in N_i} x_j(k)\bigr).
+\end{equation}
+This update rule ensures that information flows monotonically from agents holding larger values toward the rest of the network.
+
+\paragraph{Convergence properties.}
+The convergence of the Max-Consensus protocol follows from three key properties:
+
 \begin{enumerate}
-    \item \textbf{Non-decreasing property:} An agent's value can never decrease. It only updates if it sees a neighbor with a strictly larger value.
-    \item \textbf{Propagation:} The maximum value in the network acts like a wave source. At each step, it propagates to all neighbors of the agents currently holding it.
-    \item \textbf{Finite-time convergence:} Since the network is finite and connected, the maximum value will reach the furthest node in at most $D$ steps, where $D$ is the diameter of the graph. Unlike linear consensus, which is asymptotic, this protocol reaches exact consensus in finite time.
+    \item \textbf{Monotonicity:} The state of each agent is non-decreasing over time. An agent updates its value only when it observes a strictly larger value from one of its neighbors.
+    
+    \item \textbf{Propagation of the maximum:} The global maximum initial value acts as a source that propagates through the network. At each iteration, agents adjacent to the current holders of the maximum adopt this value.
+    
+    \item \textbf{Finite-time convergence:} For a connected network, the maximum value reaches all agents in at most $D$ iterations, where $D$ is the diameter of the graph. In contrast to linear consensus, which converges asymptotically, Max-Consensus achieves exact agreement in finite time.
 \end{enumerate}
+
+\paragraph{Comparison with linear consensus.}
+The choice between linear and Max-Consensus depends on the desired coordination objective. Linear consensus is appropriate when agents must compute an aggregate quantity, such as an average, and when smooth convergence is acceptable. Max-Consensus, on the other hand, is preferable when the goal is to identify or propagate an extreme value rapidly and exactly, such as in leader selection or threshold-based decision making.
 
 \subsection{Illustrative Example}
 To make these concepts concrete, consider a simple network of 3 agents connected in a line: $1 - 2 - 3$.
@@ -126,19 +278,20 @@ The simulation is implemented in Python using the MESA framework, which provides
 In our simulation, agents do not send messages over a network socket but rather "communicate" by inspecting the state of their neighbors via the shared environment (the Model). This abstraction is handled by the \texttt{ConsensusAgent} class.
 
 At each step, an agent queries the model's grid to identify its neighbors. This corresponds to the set $N_i$ defined in the Theoretical Framework.
-\begin{verbatim}
+\begin{lstlisting}[language=Python, caption={Agent step method used for neighbor-based updates.}, label={lst:agent_step}]
 # src/simulation/consensus_agent.py
 
 def step(self):
     # Get neighbors from the model's grid/network
     neighbors = self.model.grid.get_neighbors(self.pos, include_center=False)
-    
+
     # "Receive" information by reading neighbor states
     neighbor_states = [n.state for n in neighbors if isinstance(n, ConsensusAgent)]
-    
+
     # Calculate next value using the protocol
     self.next_value = self.protocol.calculate_next_value(self.state, neighbor_states)
-\end{verbatim}
+\end{lstlisting}
+
 By passing \texttt{neighbor\_states} to the protocol, we simulate the transmission of $x_j(k)$ values from neighbors $j \in N_i$ to agent $i$.
 
 \subsection{Protocols}
@@ -148,35 +301,37 @@ The consensus logic is encapsulated in strategy classes implementing the \texttt
 The \texttt{LinearConsensus} class implements the update rule described in Equation (1). As defined in the theory section, the new state is the current state plus a weighted sum of differences.
 
 In the code, this is directly translated as follows:
-\begin{verbatim}
+\begin{lstlisting}[language=Python, caption={Linear consensus update rule implementation.}, label={lst:linear_consensus}]
 # src/protocols/linear_consensus.py
 
-def calculate_next_value(self, current_state: AgentState, neighbor_states: List[AgentState]) -> float:
-    # ...
+def calculate_next_value(self, current_state: AgentState,
+                         neighbor_states: List[AgentState]) -> float:
     # Calculate the sum of differences: sum(x_j - x_i)
-    diff_sum = sum(neighbor.value - current_state.value for neighbor in neighbor_states)
-    
+    diff_sum = sum(neighbor.value - current_state.value
+                   for neighbor in neighbor_states)
+
     # Update rule: x_i(k+1) = x_i(k) + epsilon * diff_sum
     next_val = current_state.value + self.config.epsilon * diff_sum + noise
     return next_val
-\end{verbatim}
+\end{lstlisting}
 This snippet shows the direct application of the theoretical formula $x_i(k) + \epsilon \sum (x_j(k) - x_i(k))$.
 
 \subsubsection{Max-Consensus Implementation}
 Similarly, the \texttt{MaxConsensus} class implements the update rule from Equation (2). The theory states that an agent should update its value to the maximum of its own value and its neighbors' values.
 
 The implementation is concise:
-\begin{verbatim}
+\begin{lstlisting}[language=Python, caption={Max-consensus update rule implementation.}, label={lst:max_consensus}]
 # src/protocols/max_consensus.py
 
-def calculate_next_value(self, current_state: AgentState, neighbor_states: List[AgentState]) -> float:
-    # ...
+def calculate_next_value(self, current_state: AgentState,
+                         neighbor_states: List[AgentState]) -> float:
     # Find the maximum value among neighbors: max(x_j)
-    max_neighbor_val = max(neighbor.value for neighbor in neighbor_states)
-    
+    max_neighbor_val = max(neighbor.value
+                           for neighbor in neighbor_states)
+
     # Update rule: max(x_i, max(x_j))
     return max(current_state.value, max_neighbor_val)
-\end{verbatim}
+\end{lstlisting}
 This effectively realizes the discrete-time update $x_i(k+1) = \max(x_i(k), \max_{j \in N_i} x_j(k))$.
 
 \subsection{Simulation Model (\texttt{ConsensusModel})}
@@ -189,16 +344,135 @@ The \texttt{ConsensusModel} class manages the global state of the simulation. It
 
 \section{Simulation and Results}
 
-The simulation allows for the comparison of the two protocols under various network topologies.
+The proposed consensus protocols were implemented and evaluated using an interactive simulation environment based on the Mesa framework. The simulator allows the user to configure the number of agents, communication topology, consensus protocol, step size, and noise level through a graphical interface.
 
-\subsection{Convergence Behavior}
-\begin{itemize}
-    \item \textbf{Linear Consensus}: Agents' values asymptotically approach the global average. The convergence speed depends on the algebraic connectivity (second smallest eigenvalue of the Laplacian matrix) of the graph. Denser graphs (like fully connected) converge faster than sparse graphs (like rings).
-    \item \textbf{Max-Consensus}: The maximum value propagates through the network. Convergence is achieved once the maximum value has traversed the diameter of the graph. This is typically faster than linear consensus for large networks, as it is a finite-time algorithm.
-\end{itemize}
+Unless stated otherwise, all simulations were performed with $N = 10$ agents, zero measurement noise, and a fixed step size $\epsilon = 0.1$. Each agent was initialized with a random scalar value uniformly drawn from the interval $[0, 100]$, representing heterogeneous local measurements at the start of the process.
 
-\subsection{Comparison}
-The simulation clearly demonstrates the trade-off between the type of agreement (average vs. extremum) and the convergence properties. While linear consensus is robust for fusing noisy measurements to find a central tendency, max-consensus is efficient for leader election or extrema detection but sensitive to outliers (e.g., a single infinitely high value would dominate).
+\subsection{Simulation Setup}
+
+The control panel on the left-hand side of the interface allows selection of the network topology (random, ring, or fully connected), the consensus protocol (linear or max-consensus), and the numerical parameters governing the update rules. The main plotting area visualizes the evolution of agent states over discrete time steps.
+
+\subsection{Protocol Comparison}
+
+Figure~\ref{fig:linear_random} shows the behavior of the linear consensus protocol on a random communication topology. 
+Agents are initialized with heterogeneous values drawn uniformly from the interval $[0,100]$. 
+Despite large initial discrepancies, all agent states gradually converge toward a common agreement value corresponding to the global average.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{linear_random.png}
+    \caption{Linear consensus on a random topology with $N=10$ agents, $\epsilon=0.1$, and zero noise.
+    Agent values asymptotically converge toward the global average, with near-consensus reached after 44 iterations.}
+    \label{fig:linear_random}
+\end{figure}
+
+As expected from the theoretical analysis, convergence is asymptotic: the disagreement between agents decreases monotonically over time, but exact equality is achieved only in the limit. 
+The relatively slow convergence observed here is characteristic of random and sparse topologies, where information diffusion depends on the algebraic connectivity of the graph.
+
+In contrast, Figure~\ref{fig:max_random} illustrates the max-consensus protocol under the same conditions. Instead of gradual averaging, the maximum initial value propagates through the network. Agents update their states only when they observe a higher value from a neighbor, resulting in a monotonic increase of individual states.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{max_random.png}
+    \caption{Max-consensus on a random topology with $N=10$ agents, $\epsilon=0.1$, and zero noise.
+    The maximum value propagates through the network and exact consensus is reached in finite time (5 steps).}
+    \label{fig:max_random}
+\end{figure}
+
+As predicted by the theoretical analysis, max-consensus achieves exact agreement in finite time, determined by the diameter of the underlying graph. In this example, all agents reach the maximum value within five iterations, significantly faster than the convergence observed for linear consensus.
+
+\subsection{Effect of Network Topology}
+
+Beyond the choice of consensus protocol, the communication topology plays a critical role in determining convergence speed and overall system behavior. To illustrate this effect, both linear and max-consensus protocols were evaluated under different network structures, namely ring and fully connected topologies, while keeping all other parameters fixed.
+
+\subsubsection{Linear Consensus under Different Topologies}
+
+Figure~\ref{fig:linear_ring} shows the evolution of agent values for linear consensus on a ring topology. Due to the limited local connectivity, information propagates only through neighboring agents, resulting in slow diffusion of state information across the network. As a consequence, convergence to the global average is significantly delayed, with near-consensus reached only after approximately 100 iterations.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{linear_ring.png}
+    \caption{Linear consensus on a ring topology with $N=10$ agents and $\epsilon=0.1$.
+    Convergence is slow due to sparse local connectivity, requiring approximately 100 iterations to approach consensus.}
+    \label{fig:linear_ring}
+\end{figure}
+
+In contrast, Figure~\ref{fig:linear_fully} demonstrates linear consensus on a fully connected topology. In this case, each agent directly exchanges information with all others, effectively accessing the global state distribution at each iteration. This results in immediate convergence, with all agents reaching the consensus value within a single update step.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{linear_fully.png}
+    \caption{Linear consensus on a fully connected topology with $N=10$ agents and $\epsilon=0.1$.
+    Direct communication between all agents leads to immediate convergence in one iteration.}
+    \label{fig:linear_fully}
+\end{figure}
+
+
+These results highlight the strong dependence of linear consensus convergence speed on the algebraic connectivity of the communication graph.
+
+\subsubsection{Max-Consensus under Different Topologies}
+
+A similar but more pronounced effect of topology is observed for the max-consensus protocol. Figure~\ref{fig:max_ring} shows max-consensus on a ring topology. The maximum value propagates sequentially through neighboring agents, reaching all nodes within a number of iterations bounded by the graph diameter. In this configuration, exact consensus is achieved after approximately five iterations.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{max_ring.png}
+    \caption{Max-consensus on a ring topology with $N=10$ agents.
+    The maximum value propagates locally and reaches all agents in finite time (5 iterations).}
+    \label{fig:max_ring}
+\end{figure}
+
+Figure~\ref{fig:max_fully} presents the max-consensus protocol on a fully connected topology. Since each agent directly observes the global maximum at the first update, consensus is achieved immediately, requiring only a single iteration.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{max_fully.png}
+    \caption{Max-consensus on a fully connected topology with $N=10$ agents.
+    Full connectivity enables immediate propagation of the maximum value and one-step convergence.}
+    \label{fig:max_fully}
+\end{figure}
+
+\subsection{Effect of Measurement Noise}
+
+To evaluate the robustness of the consensus protocols to uncertainty, additional simulations were performed on a random communication topology with additive noise applied to agent updates. The noise level was set to $0.5$, representing moderate perturbations in local measurements or communication.
+
+\subsubsection{Linear Consensus with Noise}
+
+Figure~\ref{fig:linear_noise} shows the behavior of the linear consensus protocol under noisy conditions. Although agent trajectories exhibit noticeable fluctuations, the collective behavior still converges toward a common neighborhood around the average value. The presence of noise prevents exact convergence, resulting instead in bounded oscillations around the consensus point.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{linear_noise.png}
+    \caption{Linear consensus on a random topology with $N=10$ agents, $\epsilon=0.1$, and noise level $0.5$.
+    Despite persistent fluctuations, agent values remain clustered around the average after approximately 100 iterations.}
+    \label{fig:linear_noise}
+\end{figure}
+
+This behavior reflects the averaging nature of the linear consensus protocol, which attenuates random disturbances through repeated local aggregation.
+
+\subsubsection{Max-Consensus with Noise}
+
+Figure~\ref{fig:max_noise} presents the max-consensus protocol under the same noisy conditions. As in the noise-free case, the maximum value propagates rapidly through the network, and consensus is reached in finite time. However, noise influences which value is identified as the maximum, potentially amplifying transient fluctuations or spurious peaks.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{max_noise.png}
+    \caption{Max-consensus on a random topology with $N=10$ agents, $\epsilon=0.1$, and noise level $0.5$.
+    The protocol converges in finite time (5 iterations), but the final value reflects sensitivity to noise-induced extrema.}
+    \label{fig:max_noise}
+\end{figure}
+
+\FloatBarrier
+\section{Discussion}
+
+The conducted simulations highlight the interplay between consensus protocol design, network topology, and robustness to noise. Across all experiments, the observed behaviors closely align with the theoretical convergence properties derived earlier, providing empirical validation of the underlying models.
+
+Linear consensus exhibits asymptotic convergence driven by diffusive averaging. Its convergence speed is strongly influenced by the communication topology: sparse structures such as ring or random graphs lead to slow information propagation and long convergence times, while fully connected networks enable near-instantaneous agreement. Importantly, linear consensus demonstrates inherent robustness to noise. Even under moderate perturbations, agent states remain clustered around the global average, indicating bounded-error convergence and effective attenuation of random disturbances.
+
+Max-consensus, in contrast, achieves exact agreement in finite time, with convergence speed governed primarily by the diameter of the communication graph. Increased connectivity directly reduces convergence time, as observed in the immediate agreement achieved under fully connected topologies. However, this speed comes at the cost of robustness: max-consensus is highly sensitive to noise and outliers, as transient fluctuations can dominate the final agreed value. As a result, while max-consensus is efficient for extremum detection and leader election, it is less suitable for noisy measurement fusion tasks.
+
+
+\newpage
 
 \begin{thebibliography}{9}
 \bibitem{olfati2007consensus}
