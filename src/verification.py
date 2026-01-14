@@ -25,7 +25,6 @@ def run_simulation(protocol_type, steps=50):
     history = []
     model.run()
 
-    # Re-initialize for manual stepping
     model = ConsensusModel(ProtocolFactory())
     step_data = []
 
