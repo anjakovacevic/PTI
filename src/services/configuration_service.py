@@ -2,11 +2,13 @@ from typing import Optional
 from src.models.configuration import SimulationConfiguration
 from src.services.logger_service import LoggerService
 
+
 class ConfigurationService:
     """
     Singleton Configuration Service to manage simulation settings.
     """
-    _instance: Optional['ConfigurationService'] = None
+
+    _instance: Optional["ConfigurationService"] = None
     _config: Optional[SimulationConfiguration] = None
 
     def __new__(cls):

@@ -2,11 +2,13 @@ import logging
 import sys
 from typing import Optional
 
+
 class LoggerService:
     """
     Singleton Logger Service.
     """
-    _instance: Optional['LoggerService'] = None
+
+    _instance: Optional["LoggerService"] = None
     _logger: logging.Logger
 
     def __new__(cls):
@@ -18,11 +20,13 @@ class LoggerService:
     def _initialize_logger(self):
         self._logger = logging.getLogger("ConsensusSimulation")
         self._logger.setLevel(logging.INFO)
-        
+
         # Check if handlers already exist to avoid duplicate logs
         if not self._logger.handlers:
             handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
             handler.setFormatter(formatter)
             self._logger.addHandler(handler)
 

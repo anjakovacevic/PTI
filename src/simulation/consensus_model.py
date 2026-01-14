@@ -54,11 +54,10 @@ class ConsensusModel(Model, AbstractSimulation):
             agent = ConsensusAgent(
                 unique_id=i, model=self, initial_value=initial_value, protocol=protocol
             )
-            # self.schedule.add(agent) # Removed
+
             self.grid.place_agent(agent, node)
 
     def step(self):
-        # self.schedule.step()
         self.agents.do("step")
         self.agents.do("advance")
 
@@ -73,7 +72,6 @@ class ConsensusModel(Model, AbstractSimulation):
     def reset(self):
         self.step_count = 0
         self.running = True
-        # self.schedule = SimultaneousActivation(self)
 
         if hasattr(self, "agents"):
             self.agents.remove(self.agents)

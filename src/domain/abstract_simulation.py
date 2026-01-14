@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class AbstractSimulation(ABC):
     """
     Abstract base class for a cooperative game/simulation.
